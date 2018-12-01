@@ -19,7 +19,12 @@
     "database",
     "sql",
     "sequelize",
-    "typescript"
+    "typescript",
+    "mysql",
+    "sqlite",
+    "postgresql",
+    "mssql",
+    "rdbms"
   ],
   "author": "Vincent den Boer",
   "dependencies": {
