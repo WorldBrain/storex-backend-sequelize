@@ -1,6 +1,6 @@
 import * as Sequelize from 'sequelize'
-import { StorageRegistry } from 'storex/lib'
-import { CollectionDefinition, CollectionDefinitionMap, isChildOfRelationship, isConnectsRelationship } from 'storex/lib/types'
+import { StorageRegistry } from 'storex'
+import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship } from 'storex/lib/types'
 
 const FIELD_TYPE_MAP : {[name : string] : any} = {
     'auto-pk': {type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true},
