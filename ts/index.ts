@@ -12,6 +12,7 @@ import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead } from 
 import { createPostgresDatabaseIfNecessary } from './create-database';
 
 export class SequelizeStorageBackend extends backend.StorageBackend {
+    readonly type = 'sequelize'
     private sequelizeConfig : Sequelize.Options | string
     private sequelize : {[database : string]: Sequelize.Sequelize}
     private sequelizeModels : {[database : string]: {[name : string]: any}} = {}
