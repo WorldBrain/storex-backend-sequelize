@@ -1,6 +1,6 @@
 import * as Sequelize from 'sequelize'
 import { StorageRegistry } from 'storex'
-import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship } from 'storex/lib/types'
+import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship, CollectionField } from 'storex/lib/types'
 
 const FIELD_TYPE_MAP : {[name : string] : any} = {
     'auto-pk': {type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true},
@@ -11,27 +11,33 @@ const FIELD_TYPE_MAP : {[name : string] : any} = {
     'boolean': 'BOOLEAN',
 }
 
-export function collectionToSequelizeModel({definition, registry} : {definition : CollectionDefinition, registry : StorageRegistry}) {
+export function collectionToSequelizeModel({definition} : {definition : CollectionDefinition}) {
     const model = {}
     for (const [fieldName, fieldDefinition] of Object.entries(definition.fields)) {
         if (fieldDefinition.type == 'foreign-key') {
             continue
         }
 
-        const primitiveType = fieldDefinition.fieldObject ? fieldDefinition.fieldObject.primitiveType : fieldDefinition.type
-        const modelFieldDef = typeof FIELD_TYPE_MAP[primitiveType] === 'string'
-            ? {type: Sequelize[FIELD_TYPE_MAP[primitiveType]]}
-            : {...FIELD_TYPE_MAP[primitiveType]}
+        const modelFieldDef = fieldToSequelizeField(fieldDefinition)
+        // modelFieldDef.field = fieldDefinition.fieldName
 
         if (definition.pkIndex === fieldName) {
             modelFieldDef.primaryKey = true
         }
-        // modelFieldDef.field = fieldDefinition.fieldName
 
         model[fieldName] = modelFieldDef
     }
 
     return model
+}
+
+export function fieldToSequelizeField(definition : CollectionField) {
+    const primitiveType = definition.fieldObject ? definition.fieldObject.primitiveType : definition.type
+    const modelFieldDef = typeof FIELD_TYPE_MAP[primitiveType] === 'string'
+        ? {type: Sequelize[FIELD_TYPE_MAP[primitiveType]]}
+        : {...FIELD_TYPE_MAP[primitiveType]}
+
+    return modelFieldDef
 }
 
 export function connectSequelizeModels({registry, models} : {registry : StorageRegistry, models : {[name : string] : any}}) {

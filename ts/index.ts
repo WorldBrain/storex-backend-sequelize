@@ -11,25 +11,25 @@ import { operatorsAliases } from './operators'
 import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead } from './utils';
 import { createPostgresDatabaseIfNecessary } from './create-database';
 
+export type SequelizeMap = {[database : string]: Sequelize.Sequelize}
 export class SequelizeStorageBackend extends backend.StorageBackend {
     readonly type = 'sequelize'
     private sequelizeConfig : Sequelize.Options | string
-    private sequelize : {[database : string]: Sequelize.Sequelize}
-    private sequelizeModels : {[database : string]: {[name : string]: any}} = {}
-    private defaultDatabase : string
-    private databases : string[]
-    private logging
+    public sequelize : SequelizeMap
+    public sequelizeModels : {[database : string]: {[name : string]: any}} = {}
+    readonly defaultDatabase : string
+    readonly databases : string[]
 
     constructor(
-        {sequelizeConfig, defaultDatabase, databases, logging = false} :
-        {sequelizeConfig : any, defaultDatabase? : string, databases? : string[], logging? : boolean}
+        {sequelizeConfig, sequelize, defaultDatabase, databases, logging = false} :
+        {sequelizeConfig : any, sequelize? : SequelizeMap, defaultDatabase? : string, databases? : string[], logging? : boolean}
     ) {
         super()
         
         this.sequelizeConfig = sequelizeConfig
         this.defaultDatabase = defaultDatabase || sequelizeConfig.database || 'default'
         this.databases = databases || ['default']
-        this.logging = logging
+        this.sequelize = sequelize || this._createSequelize(logging)
     }
 
     configure({registry} : {registry : StorageRegistry}) {
@@ -51,26 +51,30 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         }
     }
 
-    _createModels = () => {
+    _createSequelize(logging : boolean) {
         const defaultOptions = {
-            logging: this.logging,
+            logging,
             operatorsAliases
         }
         if (typeof this.sequelizeConfig === 'string') {
-            this.sequelize = fromPairs(this.databases.map(database => [database, new Sequelize(<string>this.sequelizeConfig, defaultOptions)]))
+            return fromPairs(this.databases.map(database => [database, new Sequelize(<string>this.sequelizeConfig, defaultOptions)]))
         } else {
-            this.sequelize = fromPairs(this.databases.map(database => [database, new Sequelize({
+            return fromPairs(this.databases.map(database => [database, new Sequelize({
                 ...defaultOptions,
                 ...<Sequelize.Options>this.sequelizeConfig,
                 database,
             })]))
         }
+    }
+
+    _createModels = () => {
         for (const database of this.databases) {
             this.sequelizeModels[database] = {}
 
             for (const [name, definition] of Object.entries(this.registry.collections)){
                 this.sequelizeModels[database][name] = this.sequelize[database].define(
-                    name, collectionToSequelizeModel({definition, registry: this.registry})
+                    name, collectionToSequelizeModel({definition}),
+                    {timestamps: false},
                 )
             }
         }
