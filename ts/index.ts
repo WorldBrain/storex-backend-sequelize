@@ -4,12 +4,17 @@ import * as Sequelize from 'sequelize'
 import { StorageRegistry } from 'storex'
 // import { CollectionDefinition } from '../../manager/types'
 import * as backend from 'storex/lib/types/backend'
+import { StorageBackendFeatureSupport } from 'storex/lib/types/backend-features';
 import { DeletionTooBroadError } from 'storex/lib/types/errors'
 import { augmentCreateObject } from 'storex/lib/backend/utils'
 import { collectionToSequelizeModel, connectSequelizeModels } from './models'
 import { operatorsAliases } from './operators'
 import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead } from './utils';
 import { createPostgresDatabaseIfNecessary } from './create-database';
+
+export interface InternalOptions {
+    _transaction? : any
+}
 
 export type SequelizeMap = {[database : string]: Sequelize.Sequelize}
 export class SequelizeStorageBackend extends backend.StorageBackend {
@@ -19,6 +24,9 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     public sequelizeModels : {[database : string]: {[name : string]: any}} = {}
     readonly defaultDatabase : string
     readonly databases : string[]
+    readonly features : StorageBackendFeatureSupport = {
+        transaction: true,
+    }
 
     constructor(
         {sequelizeConfig, sequelize, defaultDatabase, databases, logging = false} :
@@ -37,17 +45,23 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         registry.once('initialized', this._createModels)
 
         const origCreateObject = this.createObject.bind(this)
-        this.createObject = async (collection, object, options = {}) => {
-            const sequelize = this.sequelize[options.database || this.defaultDatabase]
-            return await sequelize.transaction(async transaction => {
-                const putObject = async (collection, object, options) => {
-                    options = options || {}
-                    options['_transtaction'] = transaction
-                    return await origCreateObject(collection, object, options)
-                }
-                const augmentedCreateObject = augmentCreateObject(putObject, { registry })
+        this.createObject = async (collection, object, options = {}, internal = {}) => {
+            const createObject = transactionOperation =>
+                transactionOperation
+                ? (...args) => transactionOperation(origCreateObject, ...args)
+                : origCreateObject
+            const execute = async (transactionOperation) => {
+                const augmentedCreateObject = augmentCreateObject(createObject(transactionOperation), { registry })
                 return await augmentedCreateObject(collection, object, options)
-            })
+            }
+
+            if (!options._transaction && !internal._transaction) {
+                return await this.operation('transaction', {}, async ({transactionOperation}) => {
+                    return await execute(transactionOperation)
+                })
+            } else {
+                return await execute(null)
+            }
         }
     }
 
@@ -97,11 +111,12 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
 
     }
 
-    async createObject(collection : string, object, options : backend.CreateSingleOptions & {_transaction?} = {}) : Promise<backend.CreateSingleResult> {
+    async createObject(collection : string, object, options : backend.CreateSingleOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.CreateSingleResult> {
         // console.log('creating object in collection', collection)
         const model = this._getModel(collection, options)
         const cleanedObject = cleanRelationshipFieldsForWrite(object, this.registry.collections[collection])
-        const instance = await model.create(cleanedObject, {transaction: options._transaction})
+        const transaction = options._transaction && internal._transaction
+        const instance = await model.create(cleanedObject, {transaction})
         // console.log('created object in collection', collection)
         return {object: instance.dataValues}
     }
@@ -118,14 +133,15 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         ))
     }
     
-    async updateObjects(collection : string, query, updates, options : backend.UpdateManyOptions & {_transaction?} = {}) : Promise<backend.UpdateManyResult> {
+    async updateObjects(collection : string, query, updates, options : backend.UpdateManyOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.UpdateManyResult> {
         const {collectionDefinition, model, where} = this._prepareQuery(collection, query, options)
         
         const cleanedUpdates = cleanRelationshipFieldsForWrite(updates, collectionDefinition)
-        await model.update(cleanedUpdates, {where}, {transaction: options._transaction})
+        const transaction = options._transaction && internal._transaction
+        await model.update(cleanedUpdates, {where, transaction})
     }
     
-    async deleteObjects(collection : string, query, options : backend.DeleteManyOptions = {}) : Promise<backend.DeleteManyResult> {
+    async deleteObjects(collection : string, query, options : backend.DeleteManyOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.DeleteManyResult> {
         const {model, where} = this._prepareQuery(collection, query, options)
         
         if (options.limit) {
@@ -135,7 +151,21 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
             }
         }
 
-        await model.destroy({where})
+        const transaction = options._transaction && internal._transaction
+        await model.destroy({where, transaction})
+    }
+
+    async transaction(options, runner) {
+        return await this.sequelize[this.defaultDatabase].transaction(async transaction => {
+            const transactionOperation = async (operation, ...args) => {
+                if (typeof operation === 'string') {
+                    return await this.operation(operation, ...args, {_transaction: transaction})
+                } else {
+                    return await operation(...args, {_transaction: transaction})
+                }
+            }
+            return await runner({transactionOperation})
+        })
     }
 
     _getModel(collection : string, options : {database? : string} = {}) {
