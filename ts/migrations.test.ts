@@ -39,27 +39,31 @@ describe('Sequelize migration tests', () => {
             ],
         }        
 
-        const createStorageManager = async (includeNewUser : boolean, sequelize = null) => {
+        const createStorageManager = async (includeNewUser : boolean, sequelize = null, initialize = true) => {
             const backend = new SequelizeStorageBackend({sequelizeConfig: 'sqlite://', sequelize})
             const storageManager = new StorageManager({ backend })
             storageManager.backend.use(new schemaEditor.SchemaEditorSequelizeBackendPlugin() as any)
-            storageManager.registry.registerCollections({
-                user: [
-                    USER_COLLECTION_OLD,
-                    ...(includeNewUser ? [USER_COLLECTION_NEW] : []),
-                ],
-            })
-            await storageManager.finishInitialization()
+            if (initialize) {
+                storageManager.registry.registerCollections({
+                    user: [
+                        USER_COLLECTION_OLD,
+                        ...(includeNewUser ? [USER_COLLECTION_NEW] : []),
+                    ],
+                })
+                await storageManager.finishInitialization()
+            }
             return storageManager
         }
 
         const firstStorageManager = await createStorageManager(false)
         await firstStorageManager.backend.migrate()
         const {object: user} = await firstStorageManager.collection('user').createObject({firstName: 'John', lastName: 'Doe'})
-        const secondStorageManager = await createStorageManager(true, (firstStorageManager.backend as SequelizeStorageBackend).sequelize)
+        const sequelize = (firstStorageManager.backend as SequelizeStorageBackend).sequelize
+        const secondStorageManager = await createStorageManager(true, sequelize)
         const migrationSelection = { fromVersion: new Date(2018, 7, 31), toVersion: new Date(2018, 8, 31) }
         await migrations.executeMigration(
             secondStorageManager,
+            await createStorageManager(false, sequelize, false),
             migrationSelection,
             {
                 dataOperations: USER_DATA_MIGRATIONS,
