@@ -1,4 +1,5 @@
 import * as expect from 'expect';
+import * as Sequelize from 'sequelize'
 import StorageManager, { CollectionDefinition } from "storex";
 import { SequelizeStorageBackend } from ".";
 
@@ -27,9 +28,7 @@ describe('Sequelize migration tests', () => {
             fields: {
                 displayName: { type: 'string' },
             },
-            indices: [
-                { field: 'displayName' },
-            ]
+            indices: []
         }
         const USER_DATA_MIGRATIONS = {
             forward: [{type: 'writeField', collection: 'user', field: 'displayName', value: '`${object.firstName} ${object.lastName}`'}],
@@ -62,7 +61,7 @@ describe('Sequelize migration tests', () => {
         const secondStorageManager = await createStorageManager(true, sequelize)
         const migrationSelection = { fromVersion: new Date(2018, 7, 31), toVersion: new Date(2018, 8, 31) }
         await migrations.executeMigration(
-            secondStorageManager,
+            secondStorageManager.registry,
             await createStorageManager(false, sequelize, false),
             migrationSelection,
             {
@@ -70,6 +69,12 @@ describe('Sequelize migration tests', () => {
             },
             'all'
         )
-        expect(await secondStorageManager.collection('user').findOneObject({id: user.id})).toEqual({id: user.id, displayName: 'John Doe'})
+
+        const newUserModel = sequelize['default'].define('newUser', {
+            displayName: Sequelize.TEXT
+        }, {tableName: 'users', timestamps: false})
+        expect(await newUserModel.findAll({where: {id: user.id}})).toEqual([
+            expect.objectContaining({dataValues: {id: 1, displayName: 'John Doe'}})
+        ])
     })
 })

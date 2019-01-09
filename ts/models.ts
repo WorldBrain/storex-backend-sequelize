@@ -36,6 +36,7 @@ export function fieldToSequelizeField(definition : CollectionField) {
     const modelFieldDef = typeof FIELD_TYPE_MAP[primitiveType] === 'string'
         ? {type: Sequelize[FIELD_TYPE_MAP[primitiveType]]}
         : {...FIELD_TYPE_MAP[primitiveType]}
+    modelFieldDef.allowNull = !!definition.optional
 
     return modelFieldDef
 }
