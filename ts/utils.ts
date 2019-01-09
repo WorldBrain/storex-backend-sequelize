@@ -1,4 +1,4 @@
-import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship } from 'storex/lib/types'
+import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship } from '@worldbrain/storex/lib/types'
 
 export function cleanRelationshipFieldsForWrite(object, collectionDefinition : CollectionDefinition) {
     return _cleanRelationshipFields(object, collectionDefinition, (alias : string, fieldName : string) => {

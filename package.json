@@ -1,6 +1,6 @@
 {
   "name": "storex-backend-sequelize",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Storex Sequelize backend",
   "main": "lib/index.js",
   "typings": "lib/index",
@@ -27,7 +27,12 @@
     "rdbms"
   ],
   "author": "Vincent den Boer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WorldBrain/storex-backend-sequelize.git"
+  },
   "dependencies": {
+    "@worldbrain/storex": "^0.1.1",
     "pg": "^7.7.1",
     "sequelize": "^4.41.2"
   },

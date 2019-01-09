@@ -1,16 +1,16 @@
 import * as expect from 'expect';
 import * as Sequelize from 'sequelize'
-import StorageManager, { CollectionDefinition } from "storex";
+import StorageManager, { CollectionDefinition } from '@worldbrain/storex';
 import { SequelizeStorageBackend } from ".";
 
 describe('Sequelize migration tests', () => {
     let migrations, schemaEditor
     try {
-        migrations = require('@worldbrain-io/storex-schema-migrations')
-        schemaEditor = require('@worldbrain-io/storex-backend-sequelize-schema-editor')
+        migrations = require('@worldbrain/storex-schema-migrations')
+        schemaEditor = require('@worldbrain/storex-backend-sequelize-schema-editor')
     } catch (err) {
         migrations = schemaEditor = null
-        console.warn(`Couldn't find required dependencies for Sequelize migration tests, so skipping them`, err)
+        console.warn(`Couldn't find required dependencies for Sequelize migration tests, so skipping them`)
     }
     const maybeIt = (description, test) => migrations ? it(description, test) : it.skip(description, test)
 

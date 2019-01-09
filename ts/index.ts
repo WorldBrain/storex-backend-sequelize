@@ -1,12 +1,12 @@
 const fromPairs = require('lodash/fp/fromPairs')
 const mapValues = require('lodash/fp/mapValues')
 import * as Sequelize from 'sequelize'
-import { StorageRegistry } from 'storex'
+import { StorageRegistry } from '@worldbrain/storex'
 // import { CollectionDefinition } from '../../manager/types'
-import * as backend from 'storex/lib/types/backend'
-import { StorageBackendFeatureSupport } from 'storex/lib/types/backend-features';
-import { DeletionTooBroadError } from 'storex/lib/types/errors'
-import { augmentCreateObject } from 'storex/lib/backend/utils'
+import * as backend from '@worldbrain/storex/lib/types/backend'
+import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
+import { DeletionTooBroadError } from '@worldbrain/storex/lib/types/errors'
+import { augmentCreateObject } from '@worldbrain/storex/lib/backend/utils'
 import { collectionToSequelizeModel, connectSequelizeModels } from './models'
 import { operatorsAliases } from './operators'
 import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead } from './utils';

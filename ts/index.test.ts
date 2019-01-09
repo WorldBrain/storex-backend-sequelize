@@ -1,6 +1,6 @@
 import * as expect from 'expect';
-import StorageManager from "storex";
-import { testStorageBackend } from "storex/lib/index.tests"
+import StorageManager from "@worldbrain/storex";
+import { testStorageBackend } from "@worldbrain/storex/lib/index.tests"
 import { SequelizeStorageBackend } from "."
 
 async function initSimpleTest(sequelize = null) {
