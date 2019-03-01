@@ -24,7 +24,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     public sequelizeModels : {[database : string]: {[name : string]: any}} = {}
     readonly defaultDatabase : string
     readonly databases : string[]
-    readonly features : StorageBackendFeatureSupport = {
+    features : StorageBackendFeatureSupport = {
         transaction: true,
     }
 
