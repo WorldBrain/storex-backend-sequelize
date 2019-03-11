@@ -9,7 +9,7 @@ export const operatorsAliases = {
     $lte: Op.lte,
     $lt: Op.lt,
     // $not: Op.not,
-    // $in: Op.in,
+    $in: Op.in,
     // $notIn: Op.notIn,
     // $is: Op.is,
     // $like: Op.like,

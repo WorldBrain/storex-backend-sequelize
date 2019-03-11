@@ -30,7 +30,7 @@
     "url": "https://github.com/WorldBrain/storex-backend-sequelize.git"
   },
   "dependencies": {
-    "@worldbrain/storex": "^0.3.2",
+    "@worldbrain/storex": "^0.3.3",
     "pg": "^7.7.1",
     "sequelize": "^4.41.2"
   },
