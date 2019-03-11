@@ -2,6 +2,7 @@ const fromPairs = require('lodash/fp/fromPairs')
 const mapValues = require('lodash/fp/mapValues')
 import * as Sequelize from 'sequelize'
 import { StorageRegistry, CollectionDefinition } from '@worldbrain/storex'
+import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, CreateObjectDissection, setIn } from '@worldbrain/storex/lib/utils'
 // import { CollectionDefinition } from '../../manager/types'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
@@ -28,6 +29,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         transaction: true,
         singleFieldSorting: true,
         resultLimiting: true,
+        executeBatch: true,
     }
 
     constructor(
@@ -46,25 +48,25 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         super.configure({registry})
         registry.once('initialized', this._createModels)
 
-        const origCreateObject = this.createObject.bind(this)
-        this.createObject = async (collection, object, options = {}, internal = {}) => {
-            const createObject = transactionOperation =>
-                transactionOperation
-                ? (...args) => transactionOperation(origCreateObject, ...args)
-                : origCreateObject
-            const execute = async (transactionOperation) => {
-                const augmentedCreateObject = augmentCreateObject(createObject(transactionOperation), { registry })
-                return await augmentedCreateObject(collection, object, options)
-            }
+        // const origCreateObject = this.createObject.bind(this)
+        // this.createObject = async (collection, object, options = {}, internal = {}) => {
+        //     const createObject = transactionOperation =>
+        //         transactionOperation
+        //         ? (...args) => transactionOperation(origCreateObject, ...args)
+        //         : origCreateObject
+        //     const execute = async (transactionOperation) => {
+        //         const augmentedCreateObject = augmentCreateObject(createObject(transactionOperation), { registry })
+        //         return await augmentedCreateObject(collection, object, options)
+        //     }
 
-            if (!options._transaction && !internal._transaction) {
-                return await this.operation('transaction', {}, async ({transactionOperation}) => {
-                    return await execute(transactionOperation)
-                })
-            } else {
-                return await execute(null)
-            }
-        }
+        //     if (!options._transaction && !internal._transaction) {
+        //         return await this.operation('transaction', {}, async ({transactionOperation}) => {
+        //             return await execute(transactionOperation)
+        //         })
+        //     } else {
+        //         return await execute(null)
+        //     }
+        // }
     }
 
     _createSequelize(logging : boolean) {
@@ -114,10 +116,37 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     }
 
     async createObject(collection : string, object, options : backend.CreateSingleOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.CreateSingleResult> {
-        // console.log('creating object in collection', collection)
+        return this._complexCreateObject(collection, object, {...options, needsRawCreates: false, _transaction: null})
+    }
+
+    async _complexCreateObject(collection: string, object, options: backend.CreateSingleOptions & {needsRawCreates : boolean, _transaction : any}) {
+        const dissection = dissectCreateObjectOperation({operation: 'createObject', collection, args: object}, this.registry)
+        const batchToExecute = convertCreateObjectDissectionToBatch(dissection)
+        const batchResult = await this._rawExecuteBatch(batchToExecute, {needsRawCreates: options.needsRawCreates, _transaction: options._transaction})
+        this._reconstructCreatedObject(object, collection, dissection, batchResult.info)
+
+        return { object }
+    }
+
+    async _reconstructCreatedObject(object, collection : string, operationDissection : CreateObjectDissection, batchResultInfo) {
+        for (const step of operationDissection.objects) {
+            const collectionDefiniton = this.registry.collections[collection]
+            const pkIndex = collectionDefiniton.pkIndex
+            setIn(object, [...step.path, pkIndex], batchResultInfo[step.placeholder].object[pkIndex as string])
+        }
+    }
+
+    async _rawCreateObject(collection: string, object, options : backend.CreateSingleOptions & InternalOptions = {}, internal : InternalOptions = {}) {
         const collectionDefinition = this.registry.collections[collection]
         const model = this._getModel(collection, options)
         const cleanedObject = cleanRelationshipFieldsForWrite(object, this.registry.collections[collection])
+        await Promise.all(collectionDefinition.fieldsWithCustomType.map(
+            async fieldName => {
+                const fieldDef = collectionDefinition.fields[fieldName]
+                cleanedObject[fieldName] = await fieldDef.fieldObject.prepareForStorage(cleanedObject[fieldName])
+            }
+        ))
+
         const transaction = options._transaction && internal._transaction
         const instance = await model.create(cleanedObject, {transaction})
         // console.log('created object in collection', collection)
@@ -161,8 +190,38 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         await model.destroy({where, transaction})
     }
 
+    async executeBatch(batch : backend.OperationBatch) {
+        return this.sequelize[this.defaultDatabase].transaction(async transaction => {
+            return this._rawExecuteBatch(batch, {needsRawCreates: false, _transaction: transaction})
+        })
+    }
+
+    async _rawExecuteBatch(
+        batch : backend.OperationBatch,
+        options : {needsRawCreates : boolean, _transaction : any}
+    ) {
+        const info = {}
+        const placeholders = {}
+        for (const operation of batch) {
+            if (operation.operation === 'createObject') {
+                for (const {path, placeholder} of operation.replace || []) {
+                    operation.args[path as string] = placeholders[placeholder].id
+                }
+
+                const { object } = options.needsRawCreates
+                    ? await this._rawCreateObject(operation.collection, operation.args)
+                    : await this._complexCreateObject(operation.collection, operation.args, {needsRawCreates: true, _transaction: options._transaction})
+                info[operation.placeholder] = {object}
+                placeholders[operation.placeholder] = object
+            } else if (operation.operation === 'updateObjects') {
+                await this.updateObjects(operation.collection, operation.where, operation.updates)
+            }
+        }
+        return { info }
+    }
+
     async transaction(options, runner) {
-        return await this.sequelize[this.defaultDatabase].transaction(async transaction => {
+        return this.sequelize[this.defaultDatabase].transaction(async transaction => {
             const transactionOperation = async (operation, ...args) => {
                 if (typeof operation === 'string') {
                     return await this.operation(operation, ...args, {_transaction: transaction})
