@@ -9,6 +9,8 @@ const FIELD_TYPE_MAP : {[name : string] : any} = {
     'datetime': 'DATE',
     'string': 'STRING',
     'boolean': 'BOOLEAN',
+    'int': 'INTEGER',
+    'float': 'FLOAT',
 }
 
 export function collectionToSequelizeModel({definition} : {definition : CollectionDefinition}) {
@@ -18,7 +20,7 @@ export function collectionToSequelizeModel({definition} : {definition : Collecti
             continue
         }
 
-        const modelFieldDef = fieldToSequelizeField(fieldDefinition)
+        const modelFieldDef = fieldToSequelizeField(fieldDefinition, definition.name, fieldName)
         // modelFieldDef.field = fieldDefinition.fieldName
 
         if (definition.pkIndex === fieldName) {
@@ -31,11 +33,17 @@ export function collectionToSequelizeModel({definition} : {definition : Collecti
     return model
 }
 
-export function fieldToSequelizeField(definition : CollectionField) {
+export function fieldToSequelizeField(definition : CollectionField, collectionName : string, fieldName : string) {
     const primitiveType = definition.fieldObject ? definition.fieldObject.primitiveType : definition.type
-    const modelFieldDef = typeof FIELD_TYPE_MAP[primitiveType] === 'string'
-        ? {type: Sequelize[FIELD_TYPE_MAP[primitiveType]]}
-        : {...FIELD_TYPE_MAP[primitiveType]}
+    
+    const fieldType = FIELD_TYPE_MAP[primitiveType]
+    if (!fieldType) {
+        throw new Error(`Unknown field type for field '${fieldName}' of collection '${collectionName}': '${primitiveType}'`)
+    }
+
+    const modelFieldDef = typeof fieldType === 'string'
+        ? {type: Sequelize[fieldType]}
+        : {...fieldType}
     modelFieldDef.allowNull = !!definition.optional
 
     return modelFieldDef

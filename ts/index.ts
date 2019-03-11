@@ -9,7 +9,7 @@ import { DeletionTooBroadError } from '@worldbrain/storex/lib/types/errors'
 import { augmentCreateObject } from '@worldbrain/storex/lib/backend/utils'
 import { collectionToSequelizeModel, connectSequelizeModels } from './models'
 import { operatorsAliases } from './operators'
-import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead } from './utils';
+import { cleanRelationshipFieldsForWrite, cleanRelationshipFieldsForRead, cleanOptionalFieldsForRead, cleanRelationshipFieldsAfterCreate } from './utils';
 import { createPostgresDatabaseIfNecessary } from './create-database';
 
 export interface InternalOptions {
@@ -113,12 +113,13 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
 
     async createObject(collection : string, object, options : backend.CreateSingleOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.CreateSingleResult> {
         // console.log('creating object in collection', collection)
+        const collectionDefinition = this.registry.collections[collection]
         const model = this._getModel(collection, options)
         const cleanedObject = cleanRelationshipFieldsForWrite(object, this.registry.collections[collection])
         const transaction = options._transaction && internal._transaction
         const instance = await model.create(cleanedObject, {transaction})
         // console.log('created object in collection', collection)
-        return {object: instance.dataValues}
+        return {object: cleanRelationshipFieldsAfterCreate(instance.dataValues, collectionDefinition)}
     }
     
     async findObjects<T>(collection : string, query, options : backend.FindManyOptions = {}) : Promise<Array<T>> {
@@ -127,10 +128,12 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
 
         const instances = await model.findAll({where})
         // console.log('done finding object in collection', collection)
-        return instances.map(instance => cleanRelationshipFieldsForRead(
+        let objects = instances.map(instance => cleanRelationshipFieldsForRead(
             instance.dataValues,
             collectionDefinition
         ))
+
+        return objects.map(object => cleanOptionalFieldsForRead(object, collectionDefinition))
     }
     
     async updateObjects(collection : string, query, updates, options : backend.UpdateManyOptions & InternalOptions = {}, internal : InternalOptions = {}) : Promise<backend.UpdateManyResult> {

@@ -1,14 +1,15 @@
 {
   "name": "@worldbrain/storex-backend-sequelize",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Storex Sequelize backend",
+  "license": "MIT",
   "main": "lib/index.js",
   "typings": "lib/index",
   "scripts": {
     "prepare": "tsc",
     "prepare:watch": "npm run prepare -- -w",
-    "test": "mocha --require ts-node/register 'ts/**/*.test.ts'",
-    "test:watch": "mocha -r source-map-support/register -r ts-node/register 'ts/**/*.test.ts' --watch --watch-extensions ts"
+    "test": "mocha --require ts-node/register \"ts/**/*.test.ts\"",
+    "test:watch": "mocha -r source-map-support/register -r ts-node/register \"ts/**/*.test.ts\" --watch --watch-extensions ts"
   },
   "keywords": [
     "storage",
@@ -29,7 +30,7 @@
     "url": "https://github.com/WorldBrain/storex-backend-sequelize.git"
   },
   "dependencies": {
-    "@worldbrain/storex": "^0.1.1",
+    "@worldbrain/storex": "^0.3.2",
     "pg": "^7.7.1",
     "sequelize": "^4.41.2"
   },

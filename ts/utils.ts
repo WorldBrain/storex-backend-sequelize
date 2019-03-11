@@ -1,5 +1,23 @@
 import { CollectionDefinition, isChildOfRelationship, isConnectsRelationship } from '@worldbrain/storex/lib/types'
 
+export function cleanRelationshipFieldsAfterCreate(object, collectionDefinition : CollectionDefinition) {
+    for (const relationship of collectionDefinition.relationships) {
+        if (isChildOfRelationship(relationship)) {
+            delete object[relationship.fieldName]
+        }
+    }
+    return object
+}
+
+export function cleanOptionalFieldsForRead(object, collectionDefinition : CollectionDefinition) {
+    for (const [fieldName, fieldDefinition] of Object.entries(collectionDefinition.fields)) {
+        if (fieldDefinition.optional) {
+            delete object[fieldName]
+        }
+    }
+    return object
+}
+
 export function cleanRelationshipFieldsForWrite(object, collectionDefinition : CollectionDefinition) {
     return _cleanRelationshipFields(object, collectionDefinition, (alias : string, fieldName : string) => {
         if (!object[alias]) {
