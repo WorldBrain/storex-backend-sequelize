@@ -27,6 +27,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     features : StorageBackendFeatureSupport = {
         transaction: true,
         singleFieldSorting: true,
+        resultLimiting: true,
     }
 
     constructor(
@@ -128,7 +129,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         const {collectionDefinition, model, where} = this._prepareQuery(collection, query, options)
         const order = options.order && options.order.map(pair => [pair[0], pair[1].toUpperCase()])
 
-        const instances = await model.findAll({where, order})
+        const instances = await model.findAll({where, order, limit: options.limit})
         // console.log('done finding object in collection', collection)
         let objects = instances.map(instance => cleanRelationshipFieldsForRead(
             instance.dataValues,
