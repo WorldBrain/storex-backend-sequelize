@@ -214,7 +214,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
                 info[operation.placeholder] = {object}
                 placeholders[operation.placeholder] = object
             } else if (operation.operation === 'updateObjects') {
-                await this.updateObjects(operation.collection, operation.where, operation.updates)
+                await this.updateObjects(operation.collection, operation.where, operation.updates, {_transaction: options._transaction})
             }
         }
         return { info }
