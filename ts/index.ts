@@ -1,7 +1,7 @@
 const fromPairs = require('lodash/fp/fromPairs')
 const mapValues = require('lodash/fp/mapValues')
 import * as Sequelize from 'sequelize'
-import { StorageRegistry } from '@worldbrain/storex'
+import { StorageRegistry, CollectionDefinition } from '@worldbrain/storex'
 // import { CollectionDefinition } from '../../manager/types'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
@@ -26,6 +26,7 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     readonly databases : string[]
     features : StorageBackendFeatureSupport = {
         transaction: true,
+        singleFieldSorting: true,
     }
 
     constructor(
@@ -125,8 +126,9 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
     async findObjects<T>(collection : string, query, options : backend.FindManyOptions = {}) : Promise<Array<T>> {
         // console.log('finding object in collection', collection)
         const {collectionDefinition, model, where} = this._prepareQuery(collection, query, options)
+        const order = options.order && options.order.map(pair => [pair[0], pair[1].toUpperCase()])
 
-        const instances = await model.findAll({where})
+        const instances = await model.findAll({where, order})
         // console.log('done finding object in collection', collection)
         let objects = instances.map(instance => cleanRelationshipFieldsForRead(
             instance.dataValues,
@@ -171,11 +173,11 @@ export class SequelizeStorageBackend extends backend.StorageBackend {
         })
     }
 
-    _getModel(collection : string, options : {database? : string} = {}) {
+    _getModel(collection : string, options : {database? : string} = {}) : Sequelize.Model {
         return this.sequelizeModels[options.database || this.defaultDatabase][collection]
     }
 
-    _prepareQuery(collection : string, query, options : {database? : string}) {
+    _prepareQuery(collection : string, query, options : {database? : string}) : {collectionDefinition : CollectionDefinition, model : Sequelize.Model, where : any} {
         const collectionDefinition = this.registry.collections[collection]
         const model = this._getModel(collection, options)
         const where = cleanRelationshipFieldsForWrite(query, collectionDefinition)
