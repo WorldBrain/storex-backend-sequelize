@@ -7,6 +7,7 @@ const FIELD_TYPE_MAP : {[name : string] : any} = {
     'text': 'TEXT',
     'json': 'JSON',
     'datetime': 'DATE',
+    'timestamp': 'FLOAT',
     'string': 'STRING',
     'boolean': 'BOOLEAN',
     'int': 'INTEGER',
